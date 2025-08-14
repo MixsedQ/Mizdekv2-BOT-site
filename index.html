@@ -1,39 +1,331 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mizdekv2 BOT Site</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #f0f0f0;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sky Hopper — Single-File HTML Game</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --fg: #e6e8ef;
+      --accent: #6ee7ff;
+      --accent-2: #9bff9e;
+      --danger: #ff6b6b;
+      --muted: #a5acc1;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 700px at 70% -10%, #1b2147 0%, var(--bg) 60%);
+      color: var(--fg);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .wrap { width: min(100vw, 900px); height: min(100vh, 600px); position: relative; }
+    canvas { width: 100%; height: 100%; display: block; border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.45); background: linear-gradient(#0a1630, #050914); }
 
-        h1 {
-            font-size: 3em;
-            color: #333;
-            margin-bottom: 20px;
-        }
+    .hud {
+      position: absolute; inset: 0; pointer-events: none; display: grid; grid-template-rows: auto 1fr auto; padding: 14px; gap: 8px;
+    }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .score { font-weight: 700; letter-spacing: .5px; text-shadow: 0 2px 8px rgba(0,0,0,.4); }
+    .pill {
+      pointer-events: auto;
+      border: 1px solid rgba(255,255,255,.15);
+      background: rgba(255,255,255,.06);
+      color: var(--fg);
+      padding: 8px 12px;
+      border-radius: 999px; backdrop-filter: blur(6px);
+      display: inline-flex; align-items: center; gap: 8px;
+      cursor: pointer; user-select: none;
+      transition: transform .08s ease, background .2s ease;
+    }
+    .pill:hover { transform: translateY(-1px); }
+    .pill:active { transform: translateY(1px) scale(.98); }
 
-        p {
-            font-size: 1.5em;
-            color: #555;
-        }
-    </style>
+    .center-overlay {
+      position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+    }
+    .card { pointer-events: auto; text-align: center; background: rgba(10, 15, 35, .76); border: 1px solid rgba(255,255,255,.12); padding: 22px 20px; border-radius: 20px; backdrop-filter: blur(10px); box-shadow: 0 20px 80px rgba(0,0,0,.45); max-width: 520px; }
+    .title { font-size: clamp(20px, 3.4vw, 32px); margin: 0 0 6px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .big { font-size: 42px; line-height: 1; font-weight: 800; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); padding: 2px 6px; border-radius: 6px; }
+
+    .bad { color: var(--danger); }
+    .good { color: var(--accent-2); }
+
+    .footer-tip { text-align: center; font-size: 12px; color: var(--muted); opacity: .9; }
+
+    .blurred canvas { filter: blur(3px) brightness(.9); }
+
+    /* Starfield (pure CSS, just for vibes) */
+    .stars::before, .stars::after {
+      content: ""; position: absolute; inset: 0; border-radius: 18px; pointer-events: none; background-repeat: repeat; mix-blend-mode: screen; opacity: .55;
+      background-image: radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,.7) 99%, transparent),
+                        radial-gradient(1px 1px at 50% 70%, rgba(255,255,255,.6) 99%, transparent),
+                        radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,.4) 99%, transparent);
+      background-size: 200px 200px, 260px 260px, 300px 300px;
+      animation: drift 120s linear infinite;
+    }
+    .stars::after { opacity: .35; filter: blur(1px); animation-duration: 180s; }
+    @keyframes drift { from { background-position: 0 0, 0 0, 0 0; } to { background-position: 200px 200px, 260px 260px, 300px 300px; } }
+  </style>
 </head>
 <body>
-    <h1>Mizdekv2 BOT Site</h1>
-    <p>Commands:</p>
-    <ul>
-        <li>Commands in progress</li>
-    </ul>
+  <div class="wrap stars" id="wrap">
+    <canvas id="game" aria-label="Sky Hopper canvas" role="img"></canvas>
+
+    <div class="hud" aria-live="polite">
+      <div class="row">
+        <div class="score">Score: <span id="score">0</span></div>
+        <div class="row" style="gap:6px">
+          <button class="pill" id="btnPause" title="Pause (P)">⏸️ Pause</button>
+          <button class="pill" id="btnRestart" title="Restart (R)">🔄 Restart</button>
+        </div>
+      </div>
+      <div class="center-overlay" id="overlay">
+        <div class="card">
+          <h1 class="title">🚀 Sky Hopper</h1>
+          <p class="muted">Tap / Click or press <span class="kbd">SPACE</span> to hop. Don’t hit the obstacles. Survive as long as you can!</p>
+          <p style="margin: 14px 0 6px">High Score</p>
+          <div class="big good" id="best">0</div>
+          <div class="row" style="justify-content:center; gap:10px; margin-top:14px">
+            <button class="pill" id="btnPlay">▶️ Play</button>
+            <button class="pill" id="btnHow">❓ How to Play</button>
+          </div>
+        </div>
+      </div>
+      <div class="footer-tip">Controls: <span class="kbd">SPACE</span> / Click / Tap • <span class="kbd">P</span> Pause • <span class="kbd">R</span> Restart</div>
+    </div>
+  </div>
+
+  <script>
+    // === Utility helpers ===
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    // === Canvas + DPR setup ===
+    const wrap = document.getElementById('wrap');
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const overlay = document.getElementById('overlay');
+    const btnPlay = document.getElementById('btnPlay');
+    const btnPause = document.getElementById('btnPause');
+    const btnRestart = document.getElementById('btnRestart');
+    const btnHow = document.getElementById('btnHow');
+
+    let W = 0, H = 0, DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    function resize() {
+      const rect = wrap.getBoundingClientRect();
+      W = Math.floor(rect.width);
+      H = Math.floor(rect.height);
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    addEventListener('resize', resize, { passive: true });
+    resize();
+
+    // === Game State ===
+    const STATE = { MENU: 0, RUN: 1, PAUSE: 2, OVER: 3 };
+    let state = STATE.MENU;
+
+    const player = {
+      x: 140, y: 0, r: 14, vy: 0, gravity: 1500, jump: 500, maxFall: 900,
+      trail: []
+    };
+
+    let obstacles = [];
+    let particles = [];
+    let t0 = 0; // last frame time (s)
+    let time = 0; // total time (s)
+    let spawnTimer = 0;
+    let score = 0;
+    let best = parseInt(localStorage.getItem('skyhopper-best') || '0', 10);
+    bestEl.textContent = best;
+
+    function reset() {
+      player.y = H * 0.5;
+      player.vy = 0;
+      player.trail.length = 0;
+      obstacles = [];
+      particles = [];
+      spawnTimer = 0;
+      score = 0;
+      scoreEl.textContent = '0';
+      time = 0;
+    }
+
+    function spawnObstacle() {
+      const gap = clamp(120 + Math.random()*40 - Math.min(score*0.1, 60), 80, 200);
+      const thickness = Math.max(28 - Math.min(score*0.02, 16), 14);
+      const speed = 180 + Math.min(score*0.6, 220);
+      const center = 80 + Math.random() * (H - 160);
+      obstacles.push({ x: W + 40, w: thickness, top: center - gap/2, bottom: center + gap/2, speed });
+    }
+
+    function addParticle(x, y, vx, vy, life, size, col) {
+      particles.push({ x, y, vx, vy, life, maxLife: life, size, col });
+    }
+
+    function hop() {
+      if (state !== STATE.RUN) return;
+      player.vy = -player.jump;
+      for (let i=0;i<8;i++) addParticle(player.x-12, player.y+player.r, -60-Math.random()*80, -10+Math.random()*20, .5+Math.random()*.3, 2+Math.random()*2, 'rgba(110,231,255,.9)');
+    }
+
+    // Inputs
+    addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); if (state === STATE.MENU) start(); else if (state === STATE.RUN) hop(); else if (state === STATE.OVER) start(); }
+      if (e.key.toLowerCase() === 'p') togglePause();
+      if (e.key.toLowerCase() === 'r') restart();
+    });
+    canvas.addEventListener('pointerdown', () => { if (state === STATE.MENU) start(); else if (state === STATE.RUN) hop(); else if (state === STATE.OVER) start(); });
+
+    btnPlay.onclick = () => start();
+    btnPause.onclick = () => togglePause();
+    btnRestart.onclick = () => restart();
+    btnHow.onclick = () => alert('Tap / Click / press SPACE to hop.\nAvoid the neon gates.\nP to pause, R to restart.\nGood luck!');
+
+    function start() {
+      reset();
+      state = STATE.RUN;
+      overlay.style.display = 'none';
+      wrap.classList.remove('blurred');
+    }
+    function togglePause() {
+      if (state === STATE.RUN) { state = STATE.PAUSE; overlay.style.display = 'grid'; wrap.classList.add('blurred'); }
+      else if (state === STATE.PAUSE) { state = STATE.RUN; overlay.style.display = 'none'; wrap.classList.remove('blurred'); t0 = performance.now()/1000; }
+    }
+    function gameOver() {
+      state = STATE.OVER;
+      overlay.style.display = 'grid';
+      wrap.classList.add('blurred');
+      if (score > best) { best = score; localStorage.setItem('skyhopper-best', String(best)); bestEl.textContent = best; }
+      overlay.querySelector('.card .title').textContent = '💥 Game Over';
+      const p = overlay.querySelector('.card .muted');
+      p.innerHTML = `You scored <strong>${score}</strong>. High score: <strong>${best}</strong>.`;
+    }
+    function restart() { state = STATE.MENU; overlay.style.display = 'grid'; wrap.classList.add('blurred'); overlay.querySelector('.card .title').textContent = '🚀 Sky Hopper'; overlay.querySelector('.card .muted').innerHTML = 'Tap / Click or press <span class="kbd">SPACE</span> to hop. Don’t hit the obstacles. Survive as long as you can!'; reset(); }
+
+    // === Drawing helpers ===
+    function drawPlayer() {
+      // Glow
+      const grd = ctx.createRadialGradient(player.x, player.y, 4, player.x, player.y, 40);
+      grd.addColorStop(0, 'rgba(110,231,255,.9)');
+      grd.addColorStop(1, 'rgba(110,231,255,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(player.x, player.y, 30, 0, Math.PI*2); ctx.fill();
+
+      // Body
+      ctx.fillStyle = '#6ee7ff';
+      ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI*2); ctx.fill();
+
+      // Trail
+      player.trail.push({ x: player.x, y: player.y });
+      if (player.trail.length > 10) player.trail.shift();
+      ctx.strokeStyle = 'rgba(110,231,255,.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i=0;i<player.trail.length;i++) {
+        const p = player.trail[i];
+        if (i===0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+
+    function drawObstacles(dt) {
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const o = obstacles[i];
+        o.x -= o.speed * dt;
+        // Neon vertical bars with gap
+        ctx.fillStyle = 'rgba(155,255,158,.9)';
+        ctx.shadowColor = '#9bff9e';
+        ctx.shadowBlur = 18;
+        ctx.fillRect(o.x, 0, o.w, o.top);
+        ctx.fillRect(o.x, o.bottom, o.w, H - o.bottom);
+        ctx.shadowBlur = 0;
+
+        // Score when passing
+        if (!o.passed && o.x + o.w < player.x - player.r) {
+          o.passed = true; score++; scoreEl.textContent = score;
+        }
+        if (o.x + o.w < -40) obstacles.splice(i, 1);
+      }
+    }
+
+    function drawParticles(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= dt; if (p.life <= 0) { particles.splice(i,1); continue; }
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        ctx.globalAlpha = p.life / p.maxLife;
+        ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function collide() {
+      if (player.y - player.r <= 0 || player.y + player.r >= H) return true;
+      for (const o of obstacles) {
+        const hitX = player.x + player.r > o.x && player.x - player.r < o.x + o.w;
+        if (!hitX) continue;
+        const hitY = (player.y - player.r) < o.top || (player.y + player.r) > o.bottom;
+        if (hitY) return true;
+      }
+      return false;
+    }
+
+    // === Main loop ===
+    function loop(now) {
+      requestAnimationFrame(loop);
+      now = now / 1000;
+      const dt = Math.min(0.033, now - (t0 || now));
+      t0 = now;
+      if (state !== STATE.RUN) return;
+      time += dt; spawnTimer += dt;
+
+      // Physics
+      player.vy = clamp(player.vy + player.gravity * dt, -10000, player.maxFall);
+      player.y = clamp(player.y + player.vy * dt, player.r, H - player.r);
+
+      // Spawning
+      const spawnEvery = clamp(1.2 - Math.min(score*0.01, .6), 0.6, 1.2);
+      if (spawnTimer >= spawnEvery) { spawnTimer = 0; spawnObstacle(); }
+
+      // Render
+      ctx.clearRect(0,0,W,H);
+
+      // Subtle horizon
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#0a1630');
+      g.addColorStop(1, '#050914');
+      ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+      // Stars twinkle
+      for (let i=0;i<30;i++) {
+        const x = (i*37.3 + time*20) % W; const y = (i*73.9 + time*10) % H; const s = (i%3)+1;
+        ctx.globalAlpha = 0.2 + 0.8 * Math.abs(Math.sin(time*0.7 + i));
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y*0.6, s*0.5, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+      }
+
+      drawObstacles(dt);
+      drawPlayer();
+      drawParticles(dt);
+
+      if (collide()) {
+        for (let i=0;i<24;i++) addParticle(player.x, player.y, (Math.random()*2-1)*220, (Math.random()*2-1)*220, .6+Math.random()*.6, 2+Math.random()*3, 'rgba(255,107,107,.95)');
+        gameOver();
+      }
+    }
+
+    reset();
+    wrap.classList.add('blurred');
+    requestAnimationFrame(loop);
+  </script>
 </body>
 </html>
